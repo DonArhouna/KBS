@@ -1,0 +1,15 @@
+{
+  "name": "kbs-project",
+  "version": "1.0.0",
+  "description": "KB&S - Projet complet avec backend Express et frontend React",
+  "scripts": {
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "backend": "cd backend && npm start",
+    "frontend": "cd KBS && npm run dev",
+    "install-all": "cd backend && npm install && cd ../KBS && npm install",
+    "build": "cd KBS && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
