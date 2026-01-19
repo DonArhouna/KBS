@@ -71,7 +71,7 @@ const CategoriesAdmin = () => {
       setIsLoading(true);
       try {
         // Supprimer via l'API backend
-        const response = await fetch(`http://localhost:3001/api/categories/${categoryId}`, {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/categories/${categoryId}`, {
           method: 'DELETE'
         });
 

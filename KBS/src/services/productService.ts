@@ -33,7 +33,7 @@ export async function getAllProducts(): Promise<Product[]> {
       // Construire l'URL complète de l'image
       let imageUrl = product.image_url || '';
       if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('data:')) {
-        imageUrl = `http://localhost:3001${imageUrl}`;
+        imageUrl = imageUrl;
       }
       
       return {
@@ -69,7 +69,7 @@ export async function getProductsByCategory(categoryId: string): Promise<Product
         // Construire l'URL complète de l'image
         let imageUrl = product.image_url || '';
         if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('data:')) {
-          imageUrl = `http://localhost:3001${imageUrl}`;
+          imageUrl = imageUrl;
         }
         
         return {
