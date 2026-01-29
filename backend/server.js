@@ -4,15 +4,77 @@ const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
+const cookieParser = require('cookie-parser');
 require('dotenv').config();
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
-app.use(cors());
+// 1. Parsing indispensable tout au début
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(cookieParser());
+
+// 2. Logging global après parsing pour voir le body
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  if (req.method !== 'GET') {
+    console.log('Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('Body trace:', req.body ? 'PAYLOAD_PRESENT' : 'EMPTY_BODY');
+  }
+  next();
+});
+
+// 3. CORS
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:5173',
+  'http://localhost:8080'
+].filter(Boolean);
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+
+// Middleware pour gérer les erreurs de parsing JSON
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    console.error('ERREUR PARSING JSON:', err.message);
+    return res.status(400).json({ error: 'Payload JSON invalide', details: err.message });
+  }
+  next();
+});
+
+// Middleware d'authentification
+const authenticateToken = (req, res, next) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = (authHeader && authHeader.split(' ')[1]) || req.cookies.token;
+
+    if (!token) return res.status(401).json({ error: 'Accès non autorisé' });
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+      if (err) return res.status(403).json({ error: 'Token invalide ou expiré' });
+      req.user = user;
+      next();
+    });
+  } catch (error) {
+    console.error('Authentication error:', error);
+    return res.status(500).json({ error: 'Erreur d\'authentification' });
+  }
+};
 
 // Servir les images statiques
 app.use('/images', express.static(path.join(__dirname, '../ImagesSite')));
@@ -56,33 +118,70 @@ const pool = new Pool({
 // Initialize database on startup (only if tables don't exist)
 const initializeDatabase = async () => {
   try {
-    // Check if tables already exist
-    const result = await pool.query(`
-      SELECT EXISTS (
-        SELECT 1 FROM information_schema.tables
-        WHERE table_schema = 'public'
-        AND table_name = 'products'
-      ) as products_exists,
-      EXISTS (
-        SELECT 1 FROM information_schema.tables
-        WHERE table_schema = 'public'
-        AND table_name = 'categories'
-      ) as categories_exists
-    `);
+    console.log('Vérification et initialisation des tables de la base de données...');
 
-    const { products_exists, categories_exists } = result.rows[0];
-
-    if (products_exists && categories_exists) {
-      console.log('Database tables already exist, skipping initialization');
-      return;
-    }
-
-    console.log('Database tables not found, initializing...');
+    // 1. Scripts de base
     const initSQL = fs.readFileSync(path.join(__dirname, 'init-db.sql'), 'utf8');
     await pool.query(initSQL);
-    console.log('Database tables initialized successfully');
+    console.log('✓ init-db.sql exécuté');
+
+    // 2. Migration Auth/Cart
+    const authCartSQL = fs.readFileSync(path.join(__dirname, 'auth-cart-tables.sql'), 'utf8');
+    await pool.query(authCartSQL);
+    console.log('✓ auth-cart-tables.sql exécuté');
+
+    // 3. Réparations spécifiques stock_alerts
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS stock_alerts (
+        id SERIAL PRIMARY KEY,
+        product_id INTEGER REFERENCES products(id),
+        alert_type VARCHAR(50),
+        current_quantity INTEGER NOT NULL DEFAULT 0,
+        threshold_quantity INTEGER NOT NULL DEFAULT 0,
+        message TEXT,
+        is_resolved BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        resolved_at TIMESTAMP
+      );
+    `);
+
+    // Migration progressive des colonnes
+    const addCols = [
+      "ALTER TABLE stock_alerts ADD COLUMN IF NOT EXISTS current_quantity INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE stock_alerts ADD COLUMN IF NOT EXISTS threshold_quantity INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE stock_alerts ADD COLUMN IF NOT EXISTS message TEXT",
+      "ALTER TABLE stock_alerts ADD COLUMN IF NOT EXISTS is_resolved BOOLEAN DEFAULT FALSE"
+    ];
+
+    for (const sql of addCols) {
+      try {
+        await pool.query(sql);
+      } catch (e) {
+        // Ignorer si déjà existant (même si ADD COLUMN IF NOT EXISTS gère déjà ça en PG 9.6+)
+      }
+    }
+
+    // 4. Notifications
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        title VARCHAR(255) NOT NULL,
+        message TEXT NOT NULL,
+        type VARCHAR(50) DEFAULT 'info',
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 5. Réparations spécifiques products
+    await pool.query(`
+       ALTER TABLE products ADD COLUMN IF NOT EXISTS min_stock_level INTEGER DEFAULT 5;
+    `).catch(e => console.log('Products migration (min_stock_level):', e.message));
+
+    console.log('Base de données initialisée avec succès');
   } catch (error) {
-    console.log('Database initialization:', error.message);
+    console.error('ERREUR CRITIQUE INITIALISATION:', error.message);
   }
 };
 
@@ -123,6 +222,313 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
   }
 });
 
+// --- AUTHENTIFICATION ROUTES ---
+
+// Inscription classique
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { email, password, full_name } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email et mot de passe requis' });
+
+    const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (existingUser.rows.length > 0) return res.status(400).json({ error: 'Cet email est déjà utilisé' });
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+
+    const result = await pool.query(
+      'INSERT INTO users (email, password_hash, full_name) VALUES ($1, $2, $3) RETURNING id, email, full_name, role',
+      [email, passwordHash, full_name]
+    );
+
+    const user = result.rows[0];
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '24h' });
+
+    // Envoyer le token dans un cookie sécurisé
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 24 * 60 * 60 * 1000 // 24 heures
+    });
+
+    res.status(201).json({ user, token });
+  } catch (error) {
+    console.error('Register error:', error);
+    res.status(500).json({ error: 'Erreur lors de l\'inscription' });
+  }
+});
+
+// Connexion classique
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (result.rows.length === 0) return res.status(401).json({ error: 'Identifiants invalides' });
+
+    const user = result.rows[0];
+    if (!user.password_hash) return res.status(401).json({ error: 'Utilisez la connexion Google pour ce compte' });
+
+    const validPassword = await bcrypt.compare(password, user.password_hash);
+    if (!validPassword) return res.status(401).json({ error: 'Identifiants invalides' });
+
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '24h' });
+
+    // Envoyer le token dans un cookie sécurisé
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 24 * 60 * 60 * 1000 // 24 heures
+    });
+
+    res.json({
+      user: { id: user.id, email: user.email, full_name: user.full_name, role: user.role },
+      token
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Erreur lors de la connexion' });
+  }
+});
+
+// Connexion Google
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    const { idToken } = req.body;
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+    const { email, name, sub: google_id } = ticket.getPayload();
+
+    let userResult = await pool.query('SELECT * FROM users WHERE email = $1 OR google_id = $2', [email, google_id]);
+    let user;
+
+    if (userResult.rows.length === 0) {
+      // Création du compte
+      const result = await pool.query(
+        'INSERT INTO users (email, google_id, full_name) VALUES ($1, $2, $3) RETURNING id, email, full_name, role',
+        [email, google_id, name]
+      );
+      user = result.rows[0];
+    } else {
+      user = userResult.rows[0];
+      // Lier Google ID si ce n'est pas fait
+      if (!user.google_id) {
+        await pool.query('UPDATE users SET google_id = $1 WHERE id = $2', [google_id, user.id]);
+      }
+    }
+
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    res.json({
+      user: { id: user.id, email: user.email, full_name: user.full_name, role: user.role },
+      token
+    });
+  } catch (error) {
+    console.error('Google login error:', error);
+    res.status(500).json({ error: 'Erreur connexion Google' });
+  }
+});
+
+// Mettre à jour le profil
+app.put('/api/auth/profile', authenticateToken, async (req, res) => {
+  try {
+    const { full_name, email } = req.body;
+    if (!full_name || !email) return res.status(400).json({ error: 'Nom et email requis' });
+
+    // Vérifier si l'email n'est pas déjà pris par un autre utilisateur
+    const existingUser = await pool.query('SELECT id FROM users WHERE email = $1 AND id != $2', [email, req.user.id]);
+    if (existingUser.rows.length > 0) return res.status(400).json({ error: 'Cet email est déjà utilisé' });
+
+    const result = await pool.query(
+      'UPDATE users SET full_name = $1, email = $2, updated_at = NOW() WHERE id = $3 RETURNING id, email, full_name, role',
+      [full_name, email, req.user.id]
+    );
+
+    res.json({ user: result.rows[0] });
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ error: 'Erreur lors de la mise à jour du profil' });
+  }
+});
+
+// Changer le mot de passe
+app.put('/api/auth/change-password', authenticateToken, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Ancien et nouveau mot de passe requis' });
+
+    const userResult = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+    const user = userResult.rows[0];
+
+    if (!user.password_hash) return res.status(400).json({ error: 'Action impossible pour un compte Google' });
+
+    const validPassword = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!validPassword) return res.status(401).json({ error: 'Ancien mot de passe incorrect' });
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(newPassword, salt);
+
+    await pool.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [passwordHash, req.user.id]);
+
+    res.json({ success: true, message: 'Mot de passe modifié avec succès' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ error: 'Erreur lors du changement de mot de passe' });
+  }
+});
+
+// Déconnexion (Vider le cookie)
+app.post('/api/auth/logout', (req, res) => {
+  res.clearCookie('token');
+  res.json({ success: true, message: 'Déconnecté avec succès' });
+});
+
+// --- NOTIFICATIONS ROUTES ---
+
+// Récupérer les notifications de l'utilisateur
+app.get('/api/notifications', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50',
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Get notifications error:', error);
+    res.status(500).json({ error: 'Erreur récupération notifications' });
+  }
+});
+
+// Marquer une notification comme lue
+app.put('/api/notifications/:id/read', authenticateToken, async (req, res) => {
+  try {
+    await pool.query(
+      'UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.user.id]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Update notification error:', error);
+    res.status(500).json({ error: 'Erreur mise à jour notification' });
+  }
+});
+
+// Marquer toutes les notifications comme lues
+app.put('/api/notifications/read-all', authenticateToken, async (req, res) => {
+  try {
+    await pool.query(
+      'UPDATE notifications SET is_read = TRUE WHERE user_id = $1',
+      [req.user.id]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Read all notifications error:', error);
+    res.status(500).json({ error: 'Erreur mise à jour notifications' });
+  }
+});
+
+// --- ROUTES PANIER PERSISTANT ---
+
+// Récupérer le panier
+app.get('/api/cart', authenticateToken, async (req, res) => {
+  try {
+    const cartResult = await pool.query('SELECT id FROM carts WHERE user_id = $1', [req.user.id]);
+    if (cartResult.rows.length === 0) return res.json({ items: [] });
+
+    const itemsResult = await pool.query(`
+      SELECT ci.*, p.name, p.price, p.image_url, p.stock_quantity
+      FROM cart_items ci
+      JOIN products p ON ci.product_id = p.id
+      WHERE ci.cart_id = $1
+      `, [cartResult.rows[0].id]);
+
+    res.json({ items: itemsResult.rows });
+  } catch (error) {
+    console.error('Get cart error:', error);
+    res.status(500).json({ error: 'Erreur récupération panier' });
+  }
+});
+
+// Mettre à jour le panier (Synchronisation complète)
+app.post('/api/cart/sync', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    if (!req.body || !req.body.items) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Items du panier manquants' });
+    }
+    const { items } = req.body; // Array de { product_id, quantity }
+
+    // Obtenir ou créer le panier
+    let cartResult = await client.query('SELECT id FROM carts WHERE user_id = $1', [req.user.id]);
+    let cartId;
+
+    if (cartResult.rows.length === 0) {
+      const newCart = await client.query('INSERT INTO carts (user_id) VALUES ($1) RETURNING id', [req.user.id]);
+      cartId = newCart.rows[0].id;
+    } else {
+      cartId = cartResult.rows[0].id;
+    }
+
+    // Supprimer les anciens items et insérer les nouveaux
+    await client.query('DELETE FROM cart_items WHERE cart_id = $1', [cartId]);
+
+    for (const item of items) {
+      await client.query(
+        'INSERT INTO cart_items (cart_id, product_id, quantity) VALUES ($1, $2, $3)',
+        [cartId, item.product_id, item.quantity]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Sync cart error:', error);
+    res.status(500).json({ error: 'Erreur synchronisation panier' });
+  } finally {
+    client.release();
+  }
+});
+
+// Ajouter un article au panier
+app.post('/api/cart/items', authenticateToken, async (req, res) => {
+  try {
+    console.log('DEBUG CART: body=', req.body, 'headers=', req.headers['content-type']);
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ error: 'Corps de requête invalide ou manquant', received: typeof req.body });
+    }
+    const { product_id, quantity } = req.body;
+
+    let cartResult = await pool.query('SELECT id FROM carts WHERE user_id = $1', [req.user.id]);
+    let cartId;
+
+    if (cartResult.rows.length === 0) {
+      const newCart = await pool.query('INSERT INTO carts (user_id) VALUES ($1) RETURNING id', [req.user.id]);
+      cartId = newCart.rows[0].id;
+    } else {
+      cartId = cartResult.rows[0].id;
+    }
+
+    await pool.query(`
+      INSERT INTO cart_items(cart_id, product_id, quantity)
+    VALUES($1, $2, $3)
+      ON CONFLICT(cart_id, product_id)
+      DO UPDATE SET quantity = cart_items.quantity + EXCLUDED.quantity, updated_at = NOW()
+      `, [cartId, product_id, quantity || 1]);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Add item error:', error);
+    res.status(500).json({
+      error: 'Erreur ajout article',
+      message: error.message,
+      detail: error.detail
+    });
+  }
+});
+
 // Products routes
 app.get('/api/products', async (req, res) => {
   try {
@@ -131,7 +537,7 @@ app.get('/api/products', async (req, res) => {
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       ORDER BY p.created_at DESC
-    `);
+      `);
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching products:', error);
@@ -144,20 +550,20 @@ app.get('/api/products/stock', async (req, res) => {
   try {
     console.log('Fetching products stock...');
     const result = await pool.query(`
-      SELECT p.id, p.name, p.stock_quantity, p.price, c.name as category_name
+      SELECT p.id, p.name, p.stock_quantity, p.price, c.name as category_name, p.min_stock_level
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       ORDER BY p.name
-    `);
+      `);
     console.log('Products fetched successfully:', result.rows.length);
 
     // Calculate stock_status in JavaScript instead of SQL
     const productsWithStatus = result.rows.map(product => ({
       ...product,
-      min_stock_level: 5, // Default value since column doesn't exist in DB yet
+      min_stock_level: product.min_stock_level || 5, // Default value if not set
       stock_status:
         product.stock_quantity <= 0 ? 'out_of_stock' :
-          product.stock_quantity <= 5 ? 'low_stock' :
+          product.stock_quantity <= (product.min_stock_level || 5) ? 'low_stock' :
             'in_stock'
     }));
 
@@ -177,7 +583,7 @@ app.get('/api/products/:id', async (req, res) => {
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE p.id = $1
-    `, [id]);
+      `, [id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Product not found' });
     }
@@ -190,15 +596,15 @@ app.get('/api/products/:id', async (req, res) => {
 
 app.post('/api/products', async (req, res) => {
   try {
-    const { name, description, price, image_url, category_id, stock_quantity } = req.body;
+    const { name, description, price, image_url, category_id, stock_quantity, min_stock_level } = req.body;
     if (!name || !price) {
       return res.status(400).json({ error: 'Name and price are required' });
     }
     const result = await pool.query(`
-      INSERT INTO products (name, description, price, image_url, category_id, stock_quantity, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-      RETURNING *
-    `, [name, description, price, image_url, category_id, stock_quantity || null]);
+      INSERT INTO products(name, description, price, image_url, category_id, stock_quantity, min_stock_level, created_at, updated_at)
+    VALUES($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+    RETURNING *
+      `, [name, description, price, image_url, category_id, stock_quantity || null, min_stock_level || 5]);
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error creating product:', error);
@@ -209,16 +615,16 @@ app.post('/api/products', async (req, res) => {
 app.put('/api/products/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, price, image_url, category_id, stock_quantity } = req.body;
+    const { name, description, price, image_url, category_id, stock_quantity, min_stock_level } = req.body;
     if (!name || !price) {
       return res.status(400).json({ error: 'Name and price are required' });
     }
     const result = await pool.query(`
       UPDATE products 
-      SET name = $1, description = $2, price = $3, image_url = $4, category_id = $5, stock_quantity = $6, updated_at = NOW()
-      WHERE id = $7
-      RETURNING *
-    `, [name, description, price, image_url, category_id, stock_quantity || null, id]);
+      SET name = $1, description = $2, price = $3, image_url = $4, category_id = $5, stock_quantity = $6, min_stock_level = $7, updated_at = NOW()
+      WHERE id = $8
+    RETURNING *
+      `, [name, description, price, image_url, category_id, stock_quantity || null, min_stock_level || 5, id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Product not found' });
     }
@@ -261,10 +667,10 @@ app.post('/api/categories', async (req, res) => {
       return res.status(400).json({ error: 'Name and slug are required' });
     }
     const result = await pool.query(`
-      INSERT INTO categories (name, slug, created_at)
-      VALUES ($1, $2, NOW())
-      RETURNING *
-    `, [name, slug]);
+      INSERT INTO categories(name, slug, created_at)
+    VALUES($1, $2, NOW())
+    RETURNING *
+      `, [name, slug]);
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error creating category:', error);
@@ -283,8 +689,8 @@ app.put('/api/categories/:id', async (req, res) => {
       UPDATE categories 
       SET name = $1, slug = $2
       WHERE id = $3
-      RETURNING *
-    `, [name, slug, id]);
+    RETURNING *
+      `, [name, slug, id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Category not found' });
     }
@@ -313,21 +719,21 @@ app.delete('/api/categories/:id', async (req, res) => {
 app.get('/api/orders', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT o.*, 
-        json_agg(
-          json_build_object(
-            'id', oi.id,
-            'product_name', oi.product_name,
-            'quantity', oi.quantity,
-            'unit_price', oi.unit_price,
-            'subtotal', oi.subtotal
-          )
-        ) as items
+      SELECT o.*,
+      json_agg(
+        json_build_object(
+          'id', oi.id,
+          'product_name', oi.product_name,
+          'quantity', oi.quantity,
+          'unit_price', oi.unit_price,
+          'subtotal', oi.subtotal
+        )
+      ) as items
       FROM orders o
       LEFT JOIN order_items oi ON o.id = oi.order_id
       GROUP BY o.id
       ORDER BY o.created_at DESC
-    `);
+      `);
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching orders:', error);
@@ -335,11 +741,45 @@ app.get('/api/orders', async (req, res) => {
   }
 });
 
-app.post('/api/orders', async (req, res) => {
-  const client = await pool.connect();
+// Route pour l'historique des commandes d'un utilisateur
+app.get('/api/orders/history', authenticateToken, async (req, res) => {
   try {
+    const result = await pool.query(`
+      SELECT o.*,
+      json_agg(
+        json_build_object(
+          'id', oi.id,
+          'product_name', oi.product_name,
+          'quantity', oi.quantity,
+          'unit_price', oi.unit_price,
+          'subtotal', oi.subtotal
+        )
+      ) as items
+      FROM orders o
+      LEFT JOIN order_items oi ON o.id = oi.order_id
+      WHERE o.user_id = $1
+      GROUP BY o.id
+      ORDER BY o.created_at DESC
+    `, [req.user.id]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching order history:', error);
+    res.status(500).json({ error: 'Erreur récupération historique' });
+  }
+});
+
+app.post('/api/orders', async (req, res) => {
+  let client;
+  try {
+    client = await pool.connect();
+    console.log('Tentative création commande, body:', JSON.stringify(req.body, null, 2));
     await client.query('BEGIN');
-    const { customer_name, customer_email, customer_phone, customer_address, delivery_mode, notes, total_amount, items } = req.body;
+
+    if (!req.body || !req.body.items || !Array.isArray(req.body.items)) {
+      throw new Error('Données de commande invalides ou manquantes (items requis)');
+    }
+
+    const { customer_name, customer_email, customer_phone, customer_address, delivery_mode, notes, total_amount, items, user_id } = req.body;
     const orderNumber = `ORD-${Date.now()}`;
 
     // Récupérer les informations des produits pour vérifier le stock
@@ -348,7 +788,7 @@ app.post('/api/orders', async (req, res) => {
       SELECT id, name, stock_quantity, min_stock_level
       FROM products
       WHERE name = ANY($1)
-    `, [productNames]);
+      `, [productNames]);
 
     const productsMap = new Map(productsResult.rows.map(p => [p.name, p]));
 
@@ -364,16 +804,16 @@ app.post('/api/orders', async (req, res) => {
     }
 
     const orderResult = await client.query(`
-      INSERT INTO orders (customer_name, customer_email, customer_phone, customer_address, delivery_mode, notes, order_number, total_amount, status, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', NOW(), NOW())
-      RETURNING *
-    `, [customer_name, customer_email, customer_phone, customer_address, delivery_mode, notes, orderNumber, total_amount]);
+      INSERT INTO orders(customer_name, customer_email, customer_phone, customer_address, delivery_mode, notes, order_number, total_amount, status, user_id, created_at, updated_at)
+    VALUES($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, NOW(), NOW())
+    RETURNING *
+      `, [customer_name, customer_email, customer_phone, customer_address, delivery_mode, notes, orderNumber, total_amount, user_id || null]);
     const order = orderResult.rows[0];
 
     for (const item of items) {
       await client.query(`
-        INSERT INTO order_items (order_id, product_name, quantity, unit_price, subtotal, created_at)
-        VALUES ($1, $2, $3, $4, $5, NOW())
+        INSERT INTO order_items(order_id, product_name, quantity, unit_price, subtotal, created_at)
+    VALUES($1, $2, $3, $4, $5, NOW())
       `, [order.id, item.name, item.quantity, item.unit_price, item.subtotal]);
 
       // Déduire le stock et créer un mouvement
@@ -385,22 +825,43 @@ app.post('/api/orders', async (req, res) => {
       `, [item.quantity, product.id]);
 
       await client.query(`
-        INSERT INTO stock_movements (product_id, movement_type, quantity, reason, reference_number, notes, created_by, created_at)
-        VALUES ($1, 'out', $2, 'Commande créée', $3, $4, 'system', NOW())
+        INSERT INTO stock_movements(product_id, movement_type, quantity, reason, reference_number, notes, created_by, created_at)
+    VALUES($1, 'out', $2, 'Commande créée', $3, $4, 'system', NOW())
       `, [product.id, item.quantity, orderNumber, `Sortie automatique pour commande ${orderNumber}`]);
 
       // Vérifier et créer des alertes de stock après la mise à jour
       await checkAndCreateStockAlerts(product.id);
     }
 
+    // CRÉER UNE NOTIFICATION POUR L'UTILISATEUR
+    if (user_id) {
+      await client.query(`
+        INSERT INTO notifications(user_id, title, message, type, created_at)
+    VALUES($1, $2, $3, 'order', NOW())
+      `, [user_id, 'Commande confirmée', `Votre commande ${orderNumber} a été enregistrée avec succès.`]);
+    }
+
+    // VIDER LE PANIER PERSISTANT SI L'UTILISATEUR EST CONNECTÉ
+    if (user_id) {
+      const cartResult = await client.query('SELECT id FROM carts WHERE user_id = $1', [user_id]);
+      if (cartResult.rows.length > 0) {
+        await client.query('DELETE FROM cart_items WHERE cart_id = $1', [cartResult.rows[0].id]);
+      }
+    }
+
     await client.query('COMMIT');
+    console.log('Commande créée avec succès:', orderNumber);
     res.status(201).json(order);
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (client) await client.query('ROLLBACK');
     console.error('Error creating order:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    res.status(500).json({
+      error: error.message || 'Internal server error',
+      code: error.code,
+      detail: error.detail
+    });
   } finally {
-    client.release();
+    if (client) client.release();
   }
 });
 
@@ -432,8 +893,8 @@ app.post('/api/site-content', async (req, res) => {
     for (const item of contentItems) {
       if (!item.section || !item.field) continue;
       await client.query(`
-        INSERT INTO site_content (section, field, value, created_at, updated_at)
-        VALUES ($1, $2, $3, NOW(), NOW())
+        INSERT INTO site_content(section, field, value, created_at, updated_at)
+    VALUES($1, $2, $3, NOW(), NOW())
       `, [item.section, item.field, item.value]);
     }
     await client.query('COMMIT');
@@ -455,7 +916,7 @@ app.get('/api/stock-movements', async (req, res) => {
       FROM stock_movements sm
       LEFT JOIN products p ON sm.product_id = p.id
       ORDER BY sm.created_at DESC
-    `);
+      `);
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching stock movements:', error);
@@ -486,10 +947,10 @@ app.post('/api/stock-movements', async (req, res) => {
     }
 
     const result = await pool.query(`
-      INSERT INTO stock_movements (product_id, movement_type, quantity, reason, reference_number, notes, created_by, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-      RETURNING *
-    `, [product_id, movement_type, quantity, reason, reference_number, notes, created_by]);
+      INSERT INTO stock_movements(product_id, movement_type, quantity, reason, reference_number, notes, created_by, created_at)
+    VALUES($1, $2, $3, $4, $5, $6, $7, NOW())
+    RETURNING *
+      `, [product_id, movement_type, quantity, reason, reference_number, notes, created_by]);
 
     // Vérifier et créer des alertes de stock après le mouvement
     await checkAndCreateStockAlerts(product_id);
@@ -509,7 +970,7 @@ app.get('/api/stock-alerts', async (req, res) => {
       JOIN products p ON sa.product_id = p.id
       WHERE sa.is_resolved = FALSE
       ORDER BY sa.created_at DESC
-    `);
+      `);
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching stock alerts:', error);
@@ -525,16 +986,13 @@ app.put('/api/stock-alerts/:alertId/resolve', async (req, res) => {
       UPDATE stock_alerts
       SET is_resolved = TRUE, resolved_at = NOW()
       WHERE id = $1
-    `, [alertId]);
+      `, [alertId]);
     res.json({ success: true });
   } catch (error) {
     console.error('Error resolving stock alert:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
-
-// Récupérer l'état du stock de tous les produits
-
 
 // Mettre à jour les paramètres de stock d'un produit
 app.put('/api/products/:productId/stock-settings', async (req, res) => {
@@ -546,7 +1004,7 @@ app.put('/api/products/:productId/stock-settings', async (req, res) => {
       UPDATE products
       SET min_stock_level = $1, updated_at = NOW()
       WHERE id = $2
-    `, [min_stock_level, productId]);
+      `, [min_stock_level, productId]);
 
     // Vérifier et créer des alertes de stock après la mise à jour du seuil
     await checkAndCreateStockAlerts(productId);
@@ -679,9 +1137,9 @@ const checkAndCreateStockAlerts = async (productId) => {
     // Créer alerte de rupture si stock <= 0 et pas d'alerte existante
     if (currentStock <= 0 && existingOutOfStockAlert.rows.length === 0) {
       await pool.query(`
-        INSERT INTO stock_alerts (product_id, alert_type, current_quantity, threshold_quantity)
-        VALUES ($1, 'out_of_stock', $2, 0)
-      `, [productId, currentStock]);
+        INSERT INTO stock_alerts (product_id, alert_type, current_quantity, threshold_quantity, message)
+        VALUES ($1, 'out_of_stock', $2, 0, $3)
+      `, [productId, currentStock, `Le produit "${product.name}" est en rupture de stock.`]);
     }
     // Résoudre l'alerte de rupture si stock > 0
     else if (currentStock > 0 && existingOutOfStockAlert.rows.length > 0) {
@@ -695,9 +1153,9 @@ const checkAndCreateStockAlerts = async (productId) => {
     // Créer alerte de stock faible si stock <= seuil minimum et > 0 et pas d'alerte existante
     if (currentStock > 0 && currentStock <= minStock && existingLowStockAlert.rows.length === 0) {
       await pool.query(`
-        INSERT INTO stock_alerts (product_id, alert_type, current_quantity, threshold_quantity)
-        VALUES ($1, 'low_stock', $2, $3)
-      `, [productId, currentStock, minStock]);
+        INSERT INTO stock_alerts (product_id, alert_type, current_quantity, threshold_quantity, message)
+        VALUES ($1, 'low_stock', $2, $3, $4)
+      `, [productId, currentStock, minStock, `Le stock du produit "${product.name}" est faible (${currentStock} unités).`]);
     }
     // Résoudre l'alerte de stock faible si stock > seuil minimum
     else if (currentStock > minStock && existingLowStockAlert.rows.length > 0) {

@@ -10,22 +10,23 @@ export async function apiRequest<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_CONFIG.BASE_URL}${endpoint}`;
-  
+
   const config: RequestInit = {
+    ...options,
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
     },
-    ...options,
+    credentials: 'include',
   };
 
   try {
     const response = await fetch(url, config);
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     return await response.json();
   } catch (error) {
     console.error(`API request failed for ${endpoint}:`, error);
@@ -41,6 +42,7 @@ export async function uploadFile(file: File): Promise<{ imagePath: string; filen
   const response = await fetch(`${API_CONFIG.BASE_URL}/upload`, {
     method: 'POST',
     body: formData,
+    credentials: 'include',
   });
 
   if (!response.ok) {
