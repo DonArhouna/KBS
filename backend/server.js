@@ -55,6 +55,8 @@ app.use((req, res, next) => {
 // 3. CORS
 const allowedOrigins = [
   process.env.FRONTEND_URL,
+  'https://www.keweboutique.com',
+  'https://keweboutique.com',
   'http://localhost:5173',
   'http://localhost:8080'
 ].filter(Boolean);
