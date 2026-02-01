@@ -58,6 +58,7 @@ const allowedOrigins = [
   'https://www.keweboutique.com',
   'https://keweboutique.com',
   'http://localhost:5173',
+  'http://localhost:5173',
   'http://localhost:8080'
 ].filter(Boolean);
 
@@ -71,6 +72,12 @@ app.use(cors({
   },
   credentials: true
 }));
+
+// Headers de sécurité pour Google Auth (COOP)
+app.use((req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  next();
+});
 
 // Middleware pour gérer les erreurs de parsing JSON
 app.use((err, req, res, next) => {
