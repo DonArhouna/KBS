@@ -24,13 +24,25 @@ export async function apiRequest<T>(
     const response = await fetch(url, config);
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        if (errorData && (errorData.error || errorData.message)) {
+          errorMessage = errorData.error || errorData.message;
+        }
+      } catch (e) {
+        // Corps non JSON, on garde le message par défaut
+      }
+      throw new Error(errorMessage);
     }
 
     return await response.json();
   } catch (error) {
-    console.error(`API request failed for ${endpoint}:`, error);
-    throw error;
+    if (error instanceof Error) {
+      console.error(`API request failed for ${endpoint}:`, error.message);
+      throw error;
+    }
+    throw new Error('Une erreur inattendue est survenue');
   }
 }
 

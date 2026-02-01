@@ -6,7 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import { LogIn, Mail, Lock, Chrome, Eye, EyeOff } from 'lucide-react';
+import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
+import { jwtDecode } from 'jwt-decode';
 
 const LoginPage = () => {
     const [email, setEmail] = useState('');
@@ -37,9 +39,22 @@ const LoginPage = () => {
         }
     };
 
-    const handleGoogleLogin = () => {
-        toast({ title: "Info", description: "La connexion Google nécessite un ClientId valide dans le .env" });
-        // Ici on appellerait le SDK Google et enverrait le token au backend
+    const handleGoogleSuccess = async (credentialResponse: any) => {
+        setIsLoading(true);
+        try {
+            const response = await authService.googleLogin(credentialResponse.credential);
+            login(response.token, response.user);
+            toast({ title: "Connexion réussie", description: `Bienvenue, ${response.user.full_name} !` });
+            navigate(from, { replace: true });
+        } catch (error: any) {
+            toast({
+                title: "Erreur Google",
+                description: error.message || "Échec de la connexion Google",
+                variant: "destructive"
+            });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -73,7 +88,7 @@ const LoginPage = () => {
                         <div className="space-y-2">
                             <div className="flex justify-between items-center ml-1">
                                 <Label className="text-sm font-semibold text-gray-700">Mot de passe</Label>
-                                <button type="button" className="text-xs text-kbs-green hover:underline font-medium">Oublié ?</button>
+                                <Link to="/forgot-password" className="text-xs text-kbs-green hover:underline font-medium">Oublié ?</Link>
                             </div>
                             <div className="relative group">
                                 <Lock className="absolute left-4 top-3.5 h-5 w-5 text-gray-400 group-focus-within:text-kbs-green transition-colors" />
@@ -112,14 +127,19 @@ const LoginPage = () => {
                         </div>
                     </div>
 
-                    <Button
-                        variant="outline"
-                        className="w-full h-12 border-gray-200 hover:border-kbs-green/30 hover:bg-kbs-green/5 rounded-2xl group transition-all"
-                        onClick={handleGoogleLogin}
-                    >
-                        <Chrome className="mr-3 h-5 w-5 text-gray-400 group-hover:text-red-500 transition-colors" />
-                        <span className="font-semibold text-gray-600 group-hover:text-kbs-green transition-colors">Google</span>
-                    </Button>
+                    <div className="w-full h-12 flex justify-center">
+                        <GoogleLogin
+                            onSuccess={handleGoogleSuccess}
+                            onError={() => {
+                                toast({ title: "Erreur", description: "Connexion Google échouée", variant: "destructive" });
+                            }}
+                            theme="outline"
+                            size="large"
+                            text="continue_with"
+                            shape="pill"
+                            width="250"
+                        />
+                    </div>
                 </CardContent>
                 <CardFooter className="bg-gray-50/50 border-t border-gray-100 p-6 flex justify-center">
                     <p className="text-sm text-gray-500 font-medium">

@@ -8,6 +8,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import KBSChatbot from "./components/KBSChatbot";
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 // Pages
 import HomePage from "./pages/HomePage";
@@ -24,48 +25,58 @@ import RegisterPage from "./pages/RegisterPage";
 import SettingsPage from "./pages/SettingsPage";
 import OrdersHistoryPage from "./pages/OrdersHistoryPage";
 import NotificationsPage from "./pages/NotificationsPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <CartProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <div className="flex flex-col min-h-screen">
-              <Navbar />
-              <main className="flex-grow">
-                <Routes>
-                  <Route path="/" element={<HomePage />} />
-                  <Route path="/about" element={<AboutPage />} />
-                  <Route path="/products" element={<ProductsPage />} />
-                  <Route path="/product/:id" element={<ProductDetailPage />} />
-                  <Route path="/cart" element={<CartPage />} />
-                  <Route path="/order" element={<OrderPage />} />
-                  <Route path="/contact" element={<ContactPage />} />
-                  <Route path="/location" element={<LocationPage />} />
-                  <Route path="/admin" element={<AdminPage />} />
-                  <Route path="/login" element={<LoginPage />} />
-                  <Route path="/register" element={<RegisterPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="/orders-history" element={<OrdersHistoryPage />} />
-                  <Route path="/notifications" element={<NotificationsPage />} />
-                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </main>
-              <Footer />
-              <KBSChatbot />
-            </div>
-          </BrowserRouter>
-        </CartProvider>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <CartProvider>
+            <GoogleOAuthProvider clientId={googleClientId}>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <div className="flex flex-col min-h-screen">
+                  <Navbar />
+                  <main className="flex-grow">
+                    <Routes>
+                      <Route path="/" element={<HomePage />} />
+                      <Route path="/about" element={<AboutPage />} />
+                      <Route path="/products" element={<ProductsPage />} />
+                      <Route path="/product/:id" element={<ProductDetailPage />} />
+                      <Route path="/cart" element={<CartPage />} />
+                      <Route path="/order" element={<OrderPage />} />
+                      <Route path="/contact" element={<ContactPage />} />
+                      <Route path="/location" element={<LocationPage />} />
+                      <Route path="/admin" element={<AdminPage />} />
+                      <Route path="/login" element={<LoginPage />} />
+                      <Route path="/register" element={<RegisterPage />} />
+                      <Route path="/settings" element={<SettingsPage />} />
+                      <Route path="/orders-history" element={<OrdersHistoryPage />} />
+                      <Route path="/notifications" element={<NotificationsPage />} />
+                      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                      <Route path="/reset-password" element={<ResetPasswordPage />} />
+                      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </main>
+                  <Footer />
+                  <KBSChatbot />
+                </div>
+              </BrowserRouter>
+            </GoogleOAuthProvider>
+          </CartProvider>
+        </AuthProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

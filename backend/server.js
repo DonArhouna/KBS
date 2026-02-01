@@ -7,8 +7,30 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
+const nodemailer = require('nodemailer');
 const cookieParser = require('cookie-parser');
 require('dotenv').config();
+
+// Configuration du transporteur d'emails
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT || '465'),
+  secure: parseInt(process.env.SMTP_PORT || '465') === 465, // true pour 465, false pour les autres
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+// Vérification de la configuration SMTP au démarrage
+transporter.verify((error, success) => {
+  if (error) {
+    console.warn('⚠️ Configuration SMTP incomplète ou invalide. Les emails seront simulés dans la console.');
+    console.debug('Détail erreur SMTP:', error.message);
+  } else {
+    console.log('✅ Serveur SMTP prêt à envoyer des messages');
+  }
+});
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -178,6 +200,17 @@ const initializeDatabase = async () => {
     await pool.query(`
        ALTER TABLE products ADD COLUMN IF NOT EXISTS min_stock_level INTEGER DEFAULT 5;
     `).catch(e => console.log('Products migration (min_stock_level):', e.message));
+
+    // 6. Table pour la récupération de mot de passe
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS password_resets (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) NOT NULL,
+        token VARCHAR(255) NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
 
     console.log('Base de données initialisée avec succès');
   } catch (error) {
@@ -374,6 +407,123 @@ app.put('/api/auth/change-password', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Change password error:', error);
     res.status(500).json({ error: 'Erreur lors du changement de mot de passe' });
+  }
+});
+
+// Mot de passe oublié (Demande)
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email requis' });
+
+    const userResult = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (userResult.rows.length === 0) {
+      // Pour la sécurité, on ne dit pas si l'email existe
+      return res.json({ message: 'Si cet email existe, un lien de réinitialisation a été envoyé.' });
+    }
+
+    const token = require('crypto').randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 3600000); // 24 heures pour éviter les soucis de fuseau horaire
+
+    await pool.query(
+      'INSERT INTO password_resets (email, token, expires_at) VALUES ($1, $2, $3)',
+      [email.toLowerCase(), token, expiresAt]
+    );
+
+    const resetLink = `http://localhost:8080/reset-password?token=${token}`;
+
+    // Tenter d'envoyer un email réel si configuré
+    try {
+      if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+        await transporter.sendMail({
+          from: process.env.SMTP_FROM || `"KB&S Service" <${process.env.SMTP_USER}>`,
+          to: email,
+          subject: 'Réinitialisation de votre mot de passe - KB&S',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e1e1e1; border-radius: 10px;">
+              <h1 style="color: #2D5A27; text-align: center;">KB&S Service</h1>
+              <p>Bonjour,</p>
+              <p>Vous avez demandé la réinitialisation de votre mot de passe pour votre compte KB&S.</p>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${resetLink}" style="background-color: #2D5A27; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">Réinitialiser mon mot de passe</a>
+              </div>
+              <p>Ce lien est valable pendant 24 heures.</p>
+              <p>Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.</p>
+              <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+              <p style="font-size: 12px; color: #888; text-align: center;">Ceci est un email automatique, merci de ne pas y répondre.</p>
+            </div>
+          `
+        });
+        console.log(`✅ Email envoyé avec succès à ${email}`);
+      } else {
+        throw new Error('SMTP not configured');
+      }
+    } catch (mailError) {
+      console.warn(`⚠️ Échec de l'envoi d'email à ${email} : ${mailError.message}`);
+      // LOG DE DÉBOGAGE (Simule l'envoi d'email si SMTP échoue)
+      console.log('-----------------------------------------');
+      console.log('🔗 LIEN DE RÉINITIALISATION GÉNÉRÉ POUR :', email);
+      console.log(`Lien : ${resetLink}`);
+      console.log('-----------------------------------------');
+    }
+
+    res.json({ message: 'Si cet email existe, un lien de réinitialisation a été envoyé.' });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Erreur lors de la demande' });
+  }
+});
+
+// Réinitialisation du mot de passe (Validation)
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+    const cleanToken = token ? token.trim() : null;
+
+    console.log(`[DEBUG] Tentative de réinitialisation avec token: ${cleanToken ? cleanToken.substring(0, 10) + '...' : 'NULL'}`);
+
+    if (!cleanToken || !newPassword) {
+      return res.status(400).json({ error: 'Token et nouveau mot de passe requis' });
+    }
+
+    const resetResult = await pool.query(
+      'SELECT email FROM password_resets WHERE token = $1 AND expires_at > NOW()',
+      [cleanToken]
+    );
+
+    if (resetResult.rows.length === 0) {
+      console.log('[DEBUG] Token invalide ou expiré dans la DB');
+      // Vérifier si le token existe mais est expiré
+      const checkExists = await pool.query('SELECT expires_at FROM password_resets WHERE token = $1', [cleanToken]);
+      if (checkExists.rows.length > 0) {
+        console.log(`[DEBUG] Token trouvé mais expiré le: ${checkExists.rows[0].expires_at}`);
+      }
+      return res.status(400).json({ error: 'Lien invalide ou expiré' });
+    }
+
+    const { email } = resetResult.rows[0];
+    console.log(`[DEBUG] Token valide trouvé pour l'email: ${email}`);
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(newPassword, salt);
+
+    const updateResult = await pool.query(
+      'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE email = $2 OR email = $3 RETURNING id',
+      [passwordHash, email, email.toLowerCase()]
+    );
+
+    if (updateResult.rows.length === 0) {
+      console.error(`[DEBUG] Échec de la mise à jour : Utilisateur non trouvé pour ${email}`);
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+
+    console.log(`[DEBUG] Mot de passe mis à jour avec succès pour l'utilisateur ID: ${updateResult.rows[0].id}`);
+    await pool.query('DELETE FROM password_resets WHERE token = $1', [cleanToken]);
+
+    res.json({ success: true, message: 'Mot de passe réinitialisé avec succès' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Erreur lors de la réinitialisation' });
   }
 });
 
@@ -1023,6 +1173,49 @@ app.get('/api/services', async (req, res) => {
   } catch (error) {
     console.error('Error fetching services:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+
+// Connexion Google
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    const { idToken } = req.body;
+    if (!idToken) return res.status(400).json({ error: 'Token Google manquant' });
+
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      return res.status(500).json({ error: 'La connexion Google nécessite un ClientId valide dans le .env côté serveur' });
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    const { email, name, sub: googleId } = payload;
+
+    // Vérifier si l'utilisateur existe
+    let userResult = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    let user;
+
+    if (userResult.rows.length === 0) {
+      // Créer un utilisateur s'il n'existe pas
+      const newUser = await pool.query(
+        'INSERT INTO users (email, full_name, role, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW()) RETURNING *',
+        [email, name, 'customer']
+      );
+      user = newUser.rows[0];
+    } else {
+      user = userResult.rows[0];
+    }
+
+    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
+    res.cookie('token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 86400000 });
+
+    res.json({ token, user: { id: user.id, email: user.email, full_name: user.full_name, role: user.role } });
+  } catch (error) {
+    console.error('Google auth error:', error);
+    res.status(401).json({ error: 'Authentification Google invalide' });
   }
 });
 
