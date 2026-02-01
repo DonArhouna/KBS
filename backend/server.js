@@ -198,6 +198,22 @@ const initializeDatabase = async () => {
       );
     `);
 
+    // 5. Migration Users (Google Auth & Roles) - CRITIQUE POUR PROD
+    const userCols = [
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255) UNIQUE",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'customer'",
+      "ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name VARCHAR(255)"
+    ];
+
+    for (const sql of userCols) {
+      try {
+        await pool.query(sql);
+        console.log(`Executed: ${sql}`);
+      } catch (e) {
+        console.log(`Skipped migration: ${sql} (Already exists or error)`);
+      }
+    }
+
     // 5. Réparations spécifiques products
     await pool.query(`
        ALTER TABLE products ADD COLUMN IF NOT EXISTS min_stock_level INTEGER DEFAULT 5;
