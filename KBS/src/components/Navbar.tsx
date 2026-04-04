@@ -262,83 +262,118 @@ const Navbar = () => {
         </div>
 
         {/* MOBILE MENU OVERLAY */}
-        <div className={`fixed inset-0 z-50 md:hidden bg-white/95 backdrop-blur-md transition-all duration-500 ease-in-out ${isMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none translate-x-full"
+        {/* MODERN MOBILE MENU OVERLAY */}
+        <div className={`fixed inset-0 z-[60] md:hidden transition-all duration-700 ease-in-out ${isMenuOpen ? "opacity-100 translate-x-0" : "opacity-0 translate-x-full"
           }`}>
-          <div className="flex flex-col h-full p-6 pt-24">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-6 right-6 h-12 w-12 rounded-2xl bg-gray-50 hover:bg-gray-100"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              <X className="h-6 w-6 text-kbs-green" />
-            </Button>
+          
+          {/* FOND GLASSMORPHISM AVEC BLOBS */}
+          <div className="absolute inset-0 bg-white/80 backdrop-blur-3xl overflow-hidden">
+            <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[40%] bg-kbs-green/10 rounded-full blur-[80px] animate-blob"></div>
+            <div className="absolute top-[20%] -right-[10%] w-[60%] h-[40%] bg-kbs-light/10 rounded-full blur-[100px] animate-blob animation-delay-2000"></div>
+            <div className="absolute -bottom-[10%] left-[20%] w-[50%] h-[40%] bg-kbs-green/5 rounded-full blur-[80px] animate-blob animation-delay-4000"></div>
+          </div>
 
-            <div className="flex flex-col space-y-2">
+          <div className="relative flex flex-col h-full p-6 pt-24 z-10">
+            {/* Header du Menu */}
+            <div className="absolute top-6 left-6 right-6 flex items-center justify-between animate-fadeInUp">
+              <div className="flex items-center gap-3 text-kbs-green">
+                <img src="/lovable-uploads/7c859f46-6008-4383-be71-894406d0c0ae.png" alt="Logo" className="h-10 w-10 rounded-full border border-kbs-green/20 shadow-sm" />
+                <span className="font-bold tracking-tight text-lg">Menu KB&S</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-12 w-12 rounded-2xl bg-white/50 border border-gray-200/50 shadow-sm hover:bg-white transition-all active:scale-95"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <X className="h-6 w-6 text-kbs-green" />
+              </Button>
+            </div>
+
+            {/* Navigation centrale */}
+            <div className="flex flex-col space-y-4 my-auto">
+              <p className="text-[10px] uppercase tracking-[0.2em] font-black text-gray-400 mb-2 px-2 animate-fadeInUp">Navigation</p>
               {menuItems.map((item, index) => {
-                const icons = [Award, Shield, ShoppingBag, Mail]; // Fallback icons
+                const icons = [Award, Shield, ShoppingBag, Mail];
                 const IconComp = icons[index] || ChevronRight;
+                const isActive = location.pathname === item.path;
                 
                 return (
                   <Link
                     key={item.name}
                     to={item.path}
                     onClick={handleLinkClick}
-                    className={`flex items-center justify-between p-5 rounded-3xl transition-all duration-300 ${location.pathname === item.path
-                        ? "bg-kbs-green text-white shadow-lg shadow-kbs-green/20"
-                        : "text-gray-700 hover:bg-kbs-green/5 border border-transparent hover:border-kbs-green/10"
+                    className={`group relative flex items-center p-4 rounded-3xl transition-all duration-500 active:scale-95 animate-slideUpFade ${
+                      index === 0 ? "animate-delay-100" : 
+                      index === 1 ? "animate-delay-200" : 
+                      index === 2 ? "animate-delay-300" : "animate-delay-400"
+                    } ${isActive
+                        ? "bg-gradient-to-br from-kbs-green to-kbs-light text-white shadow-xl shadow-kbs-green/20"
+                        : "bg-white/40 border border-white/60 hover:bg-white text-gray-700 shadow-sm"
                       }`}
                   >
-                    <div className="flex items-center gap-4">
-                      <div className={`p-2 rounded-xl ${location.pathname === item.path ? "bg-white/20" : "bg-kbs-green/10 text-kbs-green"}`}>
-                        <IconComp className="h-5 w-5" />
-                      </div>
-                      <span className="text-lg font-bold">{item.name}</span>
+                    <div className={`p-3 rounded-2xl mr-4 transition-transform duration-500 group-hover:scale-110 ${
+                      isActive ? "bg-white/20" : "bg-gradient-to-br from-kbs-green/10 to-kbs-light/10 text-kbs-green"
+                    }`}>
+                      <IconComp className="h-6 w-6" />
                     </div>
-                    <ChevronRight className={`h-5 w-5 ${location.pathname === item.path ? "text-white/70" : "text-gray-300"}`} />
+                    <div className="flex-1">
+                      <p className="font-bold text-lg">{item.name}</p>
+                      <p className={`text-[10px] sm:text-xs opacity-70 ${isActive ? "text-white" : "text-gray-500"}`}>
+                        {item.path === "/" ? "Retour à l'accueil" : 
+                         item.path === "/about" ? "Qui sommes-nous ?" :
+                         item.path === "/products" ? "Nos produits naturels" : "Restons en contact"}
+                      </p>
+                    </div>
+                    <ChevronRight className={`h-5 w-5 transition-transform duration-300 group-hover:translate-x-1 ${isActive ? "text-white/60" : "text-gray-300"}`} />
                   </Link>
                 );
               })}
             </div>
 
-            <div className="mt-auto pb-10">
-              <div className="p-6 rounded-3xl bg-gradient-to-br from-kbs-green/5 to-transparent border border-kbs-green/10 mb-6">
+            {/* Pied du Menu */}
+            <div className="mt-auto space-y-4 animate-slideUpFade animate-delay-500">
+              <div className="p-5 rounded-3xl bg-white/60 backdrop-blur-sm border border-white/60 shadow-lg">
                 {isAuthenticated ? (
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-kbs-green text-white flex items-center justify-center font-bold text-xl shadow-lg ring-4 ring-white">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-kbs-green to-kbs-light text-white flex items-center justify-center font-bold text-2xl shadow-lg ring-4 ring-white/50">
                       {user?.full_name?.charAt(0).toUpperCase()}
                     </div>
-                    <div>
-                      <p className="font-bold text-gray-900">{user?.full_name}</p>
-                      <p className="text-xs text-gray-500">{user?.email}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-gray-900 truncate tracking-tight">{user?.full_name}</p>
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-kbs-green animate-pulse"></span>
+                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Membre Actif</p>
+                      </div>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleLogout}
+                      className="h-10 w-10 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 active:scale-90 transition-all shadow-sm"
+                    >
+                      <LogOut className="h-5 w-5" />
+                    </Button>
                   </div>
                 ) : (
-                  <div>
-                    <h4 className="font-bold text-gray-900 mb-1">Mon Compte KB&S</h4>
-                    <p className="text-xs text-gray-500 mb-4">Rejoignez-nous pour plus d'avantages</p>
-                    <div className="flex gap-3">
+                  <div className="text-center">
+                    <h4 className="font-bold text-gray-900 mb-1 tracking-tight">Espace Membre KB&S</h4>
+                    <p className="text-xs text-gray-500 mb-5">Commandez plus vite, suivez vos livraisons</p>
+                    <div className="flex gap-3 px-2">
                       <Link to="/login" className="flex-1" onClick={handleLinkClick}>
-                        <Button className="w-full rounded-2xl bg-kbs-green font-bold">Connexion</Button>
+                        <Button className="w-full rounded-2xl bg-gradient-to-r from-kbs-green to-kbs-light text-white font-bold shadow-lg shadow-kbs-green/20 h-12 active:scale-95 transition-all">Connexion</Button>
                       </Link>
                       <Link to="/register" className="flex-1" onClick={handleLinkClick}>
-                        <Button variant="outline" className="w-full rounded-2xl border-kbs-green text-kbs-green font-bold">S'inscrire</Button>
+                        <Button variant="outline" className="w-full rounded-2xl border-kbs-green text-kbs-green font-bold h-12 active:scale-95 transition-all">S'inscrire</Button>
                       </Link>
                     </div>
                   </div>
                 )}
               </div>
-
-              {isAuthenticated && (
-                <Button
-                  variant="ghost"
-                  onClick={handleLogout}
-                  className="w-full justify-center p-5 rounded-3xl text-red-500 bg-red-50 hover:bg-red-100 hover:text-red-600 transition-all font-bold"
-                >
-                  <LogOut className="mr-3 h-5 w-5" />
-                  Déconnexion
-                </Button>
-              )}
+              
+              <div className="flex items-center justify-center gap-4 text-gray-400 py-2">
+                <p className="text-[10px] font-medium tracking-tight">© {new Date().getFullYear()} KB&S • Qualité Premium</p>
+              </div>
             </div>
           </div>
         </div>
