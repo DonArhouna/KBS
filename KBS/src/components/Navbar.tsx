@@ -266,11 +266,11 @@ const Navbar = () => {
         <div className={`fixed inset-0 z-[60] md:hidden transition-all duration-700 ease-in-out ${isMenuOpen ? "opacity-100 translate-x-0" : "opacity-0 translate-x-full"
           }`}>
           
-          {/* FOND GLASSMORPHISM AVEC BLOBS */}
-          <div className="absolute inset-0 bg-white/80 backdrop-blur-3xl overflow-hidden">
-            <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[40%] bg-kbs-green/10 rounded-full blur-[80px] animate-blob"></div>
-            <div className="absolute top-[20%] -right-[10%] w-[60%] h-[40%] bg-kbs-light/10 rounded-full blur-[100px] animate-blob animation-delay-2000"></div>
-            <div className="absolute -bottom-[10%] left-[20%] w-[50%] h-[40%] bg-kbs-green/5 rounded-full blur-[80px] animate-blob animation-delay-4000"></div>
+          {/* FOND GLASSMORPHISM PLUS OPAQUE POUR LA LISIBILITÉ */}
+          <div className="absolute inset-0 bg-white/98 backdrop-blur-2xl overflow-hidden">
+            <div className="absolute -top-[10%] -left-[10%] w-[70%] h-[50%] bg-kbs-green/10 rounded-full blur-[100px] animate-blob"></div>
+            <div className="absolute top-[20%] -right-[10%] w-[80%] h-[50%] bg-kbs-light/10 rounded-full blur-[120px] animate-blob animation-delay-2000"></div>
+            <div className="absolute -bottom-[10%] left-[20%] w-[60%] h-[50%] bg-kbs-green/5 rounded-full blur-[100px] animate-blob animation-delay-4000"></div>
           </div>
 
           <div className="relative flex flex-col h-full p-6 pt-24 z-10">
@@ -309,7 +309,7 @@ const Navbar = () => {
                       index === 2 ? "animate-delay-300" : "animate-delay-400"
                     } ${isActive
                         ? "bg-gradient-to-br from-kbs-green to-kbs-light text-white shadow-xl shadow-kbs-green/20"
-                        : "bg-white/40 border border-white/60 hover:bg-white text-gray-700 shadow-sm"
+                        : "bg-white border border-gray-100 hover:border-kbs-green/20 text-gray-700 shadow-md hover:shadow-lg"
                       }`}
                   >
                     <div className={`p-3 rounded-2xl mr-4 transition-transform duration-500 group-hover:scale-110 ${
@@ -333,7 +333,7 @@ const Navbar = () => {
 
             {/* Pied du Menu */}
             <div className="mt-auto space-y-4 animate-slideUpFade animate-delay-500">
-              <div className="p-5 rounded-3xl bg-white/60 backdrop-blur-sm border border-white/60 shadow-lg">
+              <div className="p-5 rounded-3xl bg-white border border-gray-100 shadow-xl">
                 {isAuthenticated ? (
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-kbs-green to-kbs-light text-white flex items-center justify-center font-bold text-2xl shadow-lg ring-4 ring-white/50">
