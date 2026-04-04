@@ -974,8 +974,9 @@ app.post('/api/orders', async (req, res) => {
       if (!product) {
         throw new Error(`Produit "${item.name}" non trouvé`);
       }
-      if (product.stock_quantity < item.quantity) {
-        throw new Error(`Stock insuffisant pour "${item.name}". Disponible: ${product.stock_quantity}, demandé: ${item.quantity}`);
+      const availableStock = product.stock_quantity || 0;
+      if (availableStock < item.quantity) {
+        throw new Error(`Stock insuffisant pour "${item.name}". Disponible: ${availableStock}, demandé: ${item.quantity}`);
       }
     }
 
