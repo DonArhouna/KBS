@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X, ShoppingCart, ShoppingBag } from "lucide-react";
+import { Menu, X, ShoppingCart, ShoppingBag, Award, Shield, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useCart } from "@/context/CartContext";
@@ -78,15 +78,15 @@ const Navbar = () => {
     <nav className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm">
       <div className="container mx-auto px-4 h-20 flex items-center justify-between">
         {/* LOGO */}
-        <Link to="/" onClick={handleLinkClick} className="flex items-center space-x-3 group transition-transform hover:scale-105">
+        <Link to="/" onClick={handleLinkClick} className="flex items-center space-x-3 group transition-transform hover:scale-105 active:scale-95 shrink-0">
           <img
             src="/lovable-uploads/7c859f46-6008-4383-be71-894406d0c0ae.png"
             alt="KB&S Logo"
-            className="h-14 w-14 object-contain rounded-full border-2 border-kbs-green shadow-sm"
+            className="h-12 w-12 sm:h-14 sm:w-14 object-contain rounded-full border-2 border-kbs-green shadow-sm"
           />
-          <div className="hidden lg:block">
-            <h1 className="text-lg font-bold text-kbs-green leading-tight">KB&S</h1>
-            <p className="text-gray-500 font-medium text-[10px] uppercase tracking-tighter">KEWE BUSINESS & SERVICES</p>
+          <div className="hidden sm:block">
+            <h1 className="text-base sm:text-lg font-bold text-kbs-green leading-tight">KB&S</h1>
+            <p className="text-gray-500 font-medium text-[9px] sm:text-[10px] uppercase tracking-tighter">KEWE BUSINESS & SERVICES</p>
           </div>
         </Link>
 
@@ -261,38 +261,87 @@ const Navbar = () => {
           </div>
         </div>
 
-        {isMenuOpen && (
-          <div className="md:hidden py-4 border-t bg-white/95 backdrop-blur-sm rounded-b-2xl">
-            <div className="flex flex-col space-y-4">
-              {menuItems.map(item => (
-                <Link
-                  key={item.name}
-                  to={item.path}
-                  onClick={handleLinkClick}
-                  className={`text-gray-700 hover:text-kbs-green transition-colors ${location.pathname === item.path ? "text-kbs-green font-medium" : ""
-                    }`}
-                >
-                  {item.name}
-                </Link>
-              ))}
-              <div className="pt-4 border-t">
+        {/* MOBILE MENU OVERLAY */}
+        <div className={`fixed inset-0 z-50 md:hidden bg-white/95 backdrop-blur-md transition-all duration-500 ease-in-out ${isMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none translate-x-full"
+          }`}>
+          <div className="flex flex-col h-full p-6 pt-24">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-6 right-6 h-12 w-12 rounded-2xl bg-gray-50 hover:bg-gray-100"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <X className="h-6 w-6 text-kbs-green" />
+            </Button>
+
+            <div className="flex flex-col space-y-2">
+              {menuItems.map((item, index) => {
+                const icons = [Award, Shield, ShoppingBag, Mail]; // Fallback icons
+                const IconComp = icons[index] || ChevronRight;
+                
+                return (
+                  <Link
+                    key={item.name}
+                    to={item.path}
+                    onClick={handleLinkClick}
+                    className={`flex items-center justify-between p-5 rounded-3xl transition-all duration-300 ${location.pathname === item.path
+                        ? "bg-kbs-green text-white shadow-lg shadow-kbs-green/20"
+                        : "text-gray-700 hover:bg-kbs-green/5 border border-transparent hover:border-kbs-green/10"
+                      }`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`p-2 rounded-xl ${location.pathname === item.path ? "bg-white/20" : "bg-kbs-green/10 text-kbs-green"}`}>
+                        <IconComp className="h-5 w-5" />
+                      </div>
+                      <span className="text-lg font-bold">{item.name}</span>
+                    </div>
+                    <ChevronRight className={`h-5 w-5 ${location.pathname === item.path ? "text-white/70" : "text-gray-300"}`} />
+                  </Link>
+                );
+              })}
+            </div>
+
+            <div className="mt-auto pb-10">
+              <div className="p-6 rounded-3xl bg-gradient-to-br from-kbs-green/5 to-transparent border border-kbs-green/10 mb-6">
                 {isAuthenticated ? (
-                  <div className="flex flex-col space-y-4">
-                    <span className="text-gray-600 px-1">Connecté: <strong>{user?.full_name}</strong></span>
-                    <Button variant="ghost" onClick={logout} className="justify-start text-red-500 px-1">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      Déconnexion
-                    </Button>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-kbs-green text-white flex items-center justify-center font-bold text-xl shadow-lg ring-4 ring-white">
+                      {user?.full_name?.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="font-bold text-gray-900">{user?.full_name}</p>
+                      <p className="text-xs text-gray-500">{user?.email}</p>
+                    </div>
                   </div>
                 ) : (
-                  <Link to="/login" onClick={handleLinkClick}>
-                    <Button className="w-full bg-kbs-green">Connexion</Button>
-                  </Link>
+                  <div>
+                    <h4 className="font-bold text-gray-900 mb-1">Mon Compte KB&S</h4>
+                    <p className="text-xs text-gray-500 mb-4">Rejoignez-nous pour plus d'avantages</p>
+                    <div className="flex gap-3">
+                      <Link to="/login" className="flex-1" onClick={handleLinkClick}>
+                        <Button className="w-full rounded-2xl bg-kbs-green font-bold">Connexion</Button>
+                      </Link>
+                      <Link to="/register" className="flex-1" onClick={handleLinkClick}>
+                        <Button variant="outline" className="w-full rounded-2xl border-kbs-green text-kbs-green font-bold">S'inscrire</Button>
+                      </Link>
+                    </div>
+                  </div>
                 )}
               </div>
+
+              {isAuthenticated && (
+                <Button
+                  variant="ghost"
+                  onClick={handleLogout}
+                  className="w-full justify-center p-5 rounded-3xl text-red-500 bg-red-50 hover:bg-red-100 hover:text-red-600 transition-all font-bold"
+                >
+                  <LogOut className="mr-3 h-5 w-5" />
+                  Déconnexion
+                </Button>
+              )}
             </div>
           </div>
-        )}
+        </div>
       </div>
     </nav>
   );

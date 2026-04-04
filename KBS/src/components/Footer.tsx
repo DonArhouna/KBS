@@ -8,9 +8,9 @@ const Footer = () => {
   return (
     <footer className="bg-kbs-green text-white">
       <div className="container-custom pt-12 pb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div>
-            <div className="flex items-center gap-3 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-8 text-center md:text-left">
+          <div className="flex flex-col items-center md:items-start text-center md:text-left">
+            <div className="flex items-center gap-3 mb-6">
               <img 
                 src="/lovable-uploads/7c859f46-6008-4383-be71-894406d0c0ae.png" 
                 alt="KB&S Logo" 
@@ -57,32 +57,32 @@ const Footer = () => {
             </ul>
           </div>
 
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Contact</h3>
-            <div className="space-y-3">
-              <div className="flex items-start gap-2">
-                <MapPin size={16} className="mt-1 flex-shrink-0" />
+          <div className="flex flex-col items-center md:items-start">
+            <h3 className="text-lg font-semibold mb-6">Contact</h3>
+            <div className="space-y-4 w-full">
+              <div className="flex flex-col md:flex-row items-center md:items-start gap-2">
+                <MapPin size={18} className="md:mt-1 flex-shrink-0 text-kbs-gold" />
                 <div>
                   <p className="text-sm font-medium">Adresse principale :</p>
                   <p className="text-sm">Villa 103 Cité ANCAR 2, Kounoune</p>
                 </div>
               </div>
-              <div className="flex items-start gap-2">
-                <MapPin size={16} className="mt-1 flex-shrink-0" />
+              <div className="flex flex-col md:flex-row items-center md:items-start gap-2">
+                <MapPin size={18} className="md:mt-1 flex-shrink-0 text-kbs-gold" />
                 <div>
                   <p className="text-sm font-medium">Dépôt :</p>
                   <p className="text-sm">Maristes, Dakar</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Phone size={16} />
-                <a href="tel:+221770299821" className="text-sm hover:underline">+221 77 029 98 21</a>
+              <div className="flex flex-col md:flex-row items-center md:items-start gap-3">
+                <Phone size={18} className="text-kbs-gold" />
+                <a href="tel:+221770299821" className="text-sm hover:text-kbs-gold transition-colors">+221 77 029 98 21</a>
               </div>
-              <div className="flex items-center gap-2">
-                <Mail size={16} />
-                <a href="mailto:kewekane@yahoo.fr" className="text-sm hover:underline">kewekane@yahoo.fr</a>
+              <div className="flex flex-col md:flex-row items-center md:items-start gap-3">
+                <Mail size={18} className="text-kbs-gold" />
+                <a href="mailto:kewekane@yahoo.fr" className="text-sm hover:text-kbs-gold transition-colors">kewekane@yahoo.fr</a>
               </div>
-              <div className="flex items-center gap-3 mt-4">
+              <div className="flex justify-center md:justify-start items-center gap-4 mt-6">
                 <a href="https://instagram.com" target="_blank" rel="noreferrer" className="hover:text-kbs-gold transition-colors">
                   <Instagram size={20} />
                 </a>

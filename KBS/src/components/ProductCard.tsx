@@ -40,7 +40,7 @@ const ProductCard = ({ id, name, description, price, image }: ProductCardProps) 
 
       <Link to={`/product/${id}`} className="block">
         {/* Image Container */}
-        <div className="relative h-64 overflow-hidden">
+        <div className="relative h-48 sm:h-64 overflow-hidden">
           <div 
             className="w-full h-full bg-contain bg-center bg-no-repeat transition-transform duration-700 group-hover:scale-105" 
             style={{ backgroundImage: `url(${image})`, backgroundColor: '#f8f8f6' }}
@@ -57,20 +57,20 @@ const ProductCard = ({ id, name, description, price, image }: ProductCardProps) 
         </div>
 
         {/* Content */}
-        <div className="p-6">
-          <h3 className="text-xl font-bold text-kbs-brown mb-3 group-hover:text-kbs-green transition-colors duration-300 line-clamp-1">
+        <div className="p-4 sm:p-6">
+          <h3 className="text-lg sm:text-xl font-bold text-kbs-brown mb-2 sm:mb-3 group-hover:text-kbs-green transition-colors duration-300 line-clamp-1">
             {name}
           </h3>
-          <p className="text-gray-600 text-sm mb-4 line-clamp-2 font-light leading-relaxed">
+          <p className="text-gray-600 text-xs sm:text-sm mb-3 sm:mb-4 line-clamp-2 font-light leading-relaxed">
             {description}
           </p>
-          <div className="flex justify-between items-center mb-4">
-            <span className="text-2xl font-bold bg-gradient-to-r from-kbs-green to-kbs-light bg-clip-text text-transparent">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0 sm:mb-4">
+            <span className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-kbs-green to-kbs-light bg-clip-text text-transparent">
               {formatPrice(price)} FCFA
             </span>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5 sm:gap-1">
               {[...Array(5)].map((_, i) => (
-                <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
+                <Star key={i} className="w-3 h-3 sm:w-4 sm:h-4 fill-amber-400 text-amber-400" />
               ))}
             </div>
           </div>
@@ -78,21 +78,21 @@ const ProductCard = ({ id, name, description, price, image }: ProductCardProps) 
       </Link>
 
       {/* Action Buttons */}
-      <div className="px-6 pb-6">
-        <div className="flex gap-3">
+      <div className="px-4 sm:px-6 pb-4 sm:pb-6">
+        <div className="flex gap-2 sm:gap-3">
           <Link to={`/product/${id}`} className="flex-1">
             <Button 
               size="sm" 
               variant="outline" 
-              className="w-full border-2 border-kbs-green text-kbs-green hover:bg-kbs-green hover:text-white rounded-2xl transition-all duration-300 font-semibold"
+              className="w-full border-2 border-kbs-green text-kbs-green hover:bg-kbs-green hover:text-white rounded-2xl transition-all duration-300 font-semibold h-10 px-2 sm:px-4"
             >
-              <Eye className="mr-2 h-4 w-4" />
-              Voir détails
+              <Eye className="sm:mr-2 h-4 w-4" />
+              <span className="hidden xs:inline sm:inline">Voir détails</span>
             </Button>
           </Link>
           <Button 
             size="sm" 
-            className="bg-gradient-to-r from-kbs-green to-kbs-light hover:from-kbs-green/90 hover:to-kbs-light/90 text-white px-6 rounded-2xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 relative group"
+            className="bg-gradient-to-r from-kbs-green to-kbs-light hover:from-kbs-green/90 hover:to-kbs-light/90 text-white px-4 sm:px-6 rounded-2xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 h-10 relative group"
             onClick={handleAddToCart}
           >
             <div className="relative">

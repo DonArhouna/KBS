@@ -102,18 +102,18 @@ const ProductsPage = () => {
         imageSrc={contentImages.bannerImage}
       />
 
-      {/* Product Filters */}
-      <section className="bg-white py-8 border-b">
+      {/* Product Filters - Scroll horizontal moderne */}
+      <section className="bg-white py-6 sm:py-8 border-b sticky top-20 z-40">
         <div className="container-custom">
-          <div className="flex overflow-x-auto pb-2 gap-2">
+          <div className="flex overflow-x-auto pb-4 gap-2 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 sm:justify-center">
             {categories.map((category) => (
               <button
                 key={category.id}
                 onClick={() => setActiveCategory(category.id)}
-                className={`px-4 py-2 whitespace-nowrap rounded-full transition-colors ${
+                className={`px-6 py-2.5 whitespace-nowrap rounded-2xl text-sm font-bold transition-all duration-300 ${
                   activeCategory === category.id
-                    ? "bg-kbs-green text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    ? "bg-kbs-green text-white shadow-lg shadow-kbs-green/20 scale-105"
+                    : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-transparent hover:border-kbs-green/10"
                 }`}
               >
                 {category.name}
@@ -124,7 +124,7 @@ const ProductsPage = () => {
       </section>
 
       {/* Products Grid */}
-      <section className="py-16 bg-kbs-beige">
+      <section className="py-10 sm:py-16 bg-kbs-beige/30">
         <div className="container-custom">
           {isLoading ? (
             <div className="flex justify-center items-center py-12">
