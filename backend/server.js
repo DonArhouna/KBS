@@ -127,7 +127,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 10 * 1024 * 1024 }, // Limite augmentée à 10MB
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
@@ -455,7 +455,8 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       [email.toLowerCase(), token, expiresAt]
     );
 
-    const resetLink = `http://localhost:8080/reset-password?token=${token}`;
+    const frontendUrl = process.env.FRONTEND_URL || 'https://keweboutique.com';
+    const resetLink = `${frontendUrl}/reset-password?token=${token}`;
 
     // Tenter d'envoyer un email réel si configuré
     try {
