@@ -42,8 +42,8 @@ const ProductCard = ({ id, name, description, price, image }: ProductCardProps) 
         {/* Image Container */}
         <div className="relative h-64 overflow-hidden">
           <div 
-            className="w-full h-full bg-cover bg-center transition-transform duration-700 group-hover:scale-110" 
-            style={{ backgroundImage: `url(${image})` }}
+            className="w-full h-full bg-contain bg-center bg-no-repeat transition-transform duration-700 group-hover:scale-105" 
+            style={{ backgroundImage: `url(${image})`, backgroundColor: '#f8f8f6' }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           
