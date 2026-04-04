@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { getAllProducts, getAllCategories, Product, Category } from "@/services/productService";
 import { getSiteContent } from "@/services/contentService";
 
+import { SiteContent } from "@/services/contentService";
+
 interface Message {
   id: string;
   text: string;
@@ -14,15 +16,15 @@ interface Message {
   timestamp: Date;
 }
 
-interface ChatbotSiteContent {
+// Étend SiteContent pour inclure les champs spécifiques au chatbot s'ils existent dans la DB
+interface ChatbotSiteContent extends Partial<Omit<SiteContent, 'about' | 'contact'>> {
   delivery?: { description?: string };
   payment?: { description?: string };
-  contact?: { phone?: string; email?: string };
   hours?: { description?: string };
   location?: { description?: string };
-  about?: { description?: string };
   activities?: { description?: string };
-  products?: { bannerImage?: string; qualityImage?: string };
+  about?: any;
+  contact?: any;
 }
 
 const KBSChatbot = () => {
@@ -65,10 +67,10 @@ const KBSChatbot = () => {
 
   useEffect(() => {
     if (isOpen && messages.length === 0) {
-      // Message d'accueil
+      // Message d'accueil enrichi
       const welcomeMessage: Message = {
         id: "welcome",
-        text: "Bonjour ! Je suis l'assistant virtuel de KB&S. Je peux vous aider avec nos produits, services, livraisons et modes de paiement. Comment puis-je vous aider aujourd'hui ?",
+        text: "Bonjour ! 👋 Je suis l'assistant virtuel de KB&S.\n\nJe peux vous aider avec :\n• 🛍️ Produits et commandes\n• 🔐 Compte et authentification\n• 🛒 Panier et paiement\n• 🚚 Livraison\n• 📱 Notifications\n\nComment puis-je vous aider ?",
         isBot: true,
         timestamp: new Date()
       };
@@ -115,14 +117,34 @@ const KBSChatbot = () => {
       return siteContent.payment?.description || "Nous acceptons plusieurs modes de paiement : WhatsApp (recommandé), carte bancaire, Wave, et Orange Money. Vous pouvez choisir votre mode de paiement préféré lors de la finalisation de votre commande.";
     }
 
-    // Commande
+    // Processus de commande détaillé
+    if (message.includes("comment commander") || message.includes("étapes") || message.includes("processus commande")) {
+      return "📋 **Processus de commande en 6 étapes :**\n\n**1.** Parcourez nos produits et cliquez sur 🛒\n**2.** Consultez votre panier et ajustez les quantités\n**3.** Cliquez sur \"Passer la commande\"\n**4.** Connectez-vous ou créez un compte (redirection automatique)\n**5.** Remplissez vos infos de livraison\n**6.** Validez → Confirmation WhatsApp immédiate ! 📱";
+    }
+
+    // Commande simple
     if (message.includes("commande") || message.includes("commander") || message.includes("acheter")) {
-      return "Pour passer une commande, ajoutez vos produits au panier depuis notre page 'Produits', puis cliquez sur 'Passer une commande'. Vous pourrez ensuite choisir votre mode de livraison et de paiement.";
+      return "C'est très simple ! Ajoutez vos produits préférés au panier (icône 🛒), puis cliquez sur le bouton \"Passer la commande\" dans votre panier. Le système vous guidera étape par étape jusqu'à la confirmation.";
+    }
+
+    // Authentification et compte
+    if (message.includes("compte") || message.includes("connexion") || message.includes("inscription") || message.includes("google")) {
+      return "🔐 **Votre Espace KB&S :**\n\nVous pouvez vous connecter via Email ou via Google.\n\n**Bénéfices :**\n✅ Panier sauvegardé sur tous vos appareils\n✅ Historique de vos commandes passées\n✅ Notifications personnalisées\n✅ Gain de temps lors de vos futurs achats !";
+    }
+
+    // Panier
+    if (message.includes("panier") || message.includes("modifier quantité")) {
+      return "🛒 **Gestion du panier :**\n\nVous pouvez modifier les quantités ou retirer des articles directement dans la page Panier. Si vous êtes connecté, votre panier est synchronisé automatiquement avec votre compte pour ne jamais perdre vos choix.";
+    }
+
+    // Historique et notifications
+    if (message.includes("historique") || message.includes("mes commandes") || message.includes("notification")) {
+      return "📊 **Suivi :**\n\nRetrouvez toutes vos commandes passées dans l'onglet \"Historique des commandes\" de votre menu \"Mon compte\". Vous recevrez également des notifications en direct pour chaque validation de commande !";
     }
 
     // Contact
     if (message.includes("contact") || message.includes("téléphone") || message.includes("adresse")) {
-      return `📞 **Nos coordonnées :**\n\n📱 **WhatsApp :** +221 77 029 98 21\n📧 **Email :** kewekane@yahoo.fr\n\nVous pouvez également nous contacter via notre page 'Contact' pour plus d'informations !`;
+      return `📞 **Contactez-nous :**\n\n📱 **WhatsApp :** +221 77 029 98 21\n📧 **Email :** kewekane@yahoo.fr\n📍 **Adresse :** 123 Rue de la Paix, Dakar\n\nNotre équipe est à votre disposition pour toute question !`;
     }
 
     // Horaires
@@ -155,8 +177,8 @@ const KBSChatbot = () => {
       return "Je vous en prie ! N'hésitez pas si vous avez d'autres questions concernant KB&S.";
     }
 
-    // Réponse par défaut avec contacts
-    return `Je suis spécialisé dans les informations concernant KB&S (produits, commandes, livraison, paiement). Pouvez-vous reformuler votre question en rapport avec nos services ? Pour plus de précision, veuillez contacter notre support :\n\n📞 **Téléphone :** +221 77 029 98 21\n📧 **Email :** kewekane@yahoo.fr\n💬 **WhatsApp :** +221 77 029 98 21`;
+    // Réponse par défaut enrichie
+    return `Je suis spécialisé dans les services KB&S.\n\nJe peux vous renseigner sur :\n🛍️ **Nos Produits**\n📋 **Le processus de commande**\n🔐 **L'Authentification**\n🚚 **La Livraison & Paiement**\n\nPouvez-vous préciser votre question ou contacter notre support WhatsApp : +221 77 029 98 21 ?`;
   };
 
   const handleSendMessage = async () => {
@@ -181,7 +203,7 @@ const KBSChatbot = () => {
         isBot: true,
         timestamp: new Date()
       };
-      
+
       setMessages(prev => [...prev, botResponse]);
       setIsTyping(false);
     }, 1000);
@@ -222,7 +244,7 @@ const KBSChatbot = () => {
           </Button>
         </CardTitle>
       </CardHeader>
-      
+
       <CardContent className="flex flex-col h-full p-0">
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.map((message) => (
@@ -236,11 +258,10 @@ const KBSChatbot = () => {
                 </div>
               )}
               <div
-                className={`max-w-[70%] p-2 rounded-lg text-sm ${
-                  message.isBot
-                    ? 'bg-white text-gray-800 border border-gray-200'
-                    : 'bg-kbs-green text-white'
-                }`}
+                className={`max-w-[70%] p-2 rounded-lg text-sm ${message.isBot
+                  ? 'bg-white text-gray-800 border border-gray-200'
+                  : 'bg-kbs-green text-white'
+                  }`}
               >
                 {message.text}
               </div>
@@ -251,7 +272,7 @@ const KBSChatbot = () => {
               )}
             </div>
           ))}
-          
+
           {isTyping && (
             <div className="flex gap-2 justify-start">
               <div className="w-6 h-6 rounded-full bg-kbs-green flex items-center justify-center flex-shrink-0">
@@ -260,16 +281,16 @@ const KBSChatbot = () => {
               <div className="bg-white p-2 rounded-lg text-sm border border-gray-200">
                 <div className="flex gap-1">
                   <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                 </div>
               </div>
             </div>
           )}
-          
+
           <div ref={messagesEndRef} />
         </div>
-        
+
         <div className="p-4 border-t bg-white">
           <div className="flex gap-2">
             <Input

@@ -43,6 +43,7 @@ export interface CreateOrderData {
     subtotal: number;
   }>;
   total: number;
+  user_id?: number | null;
 }
 
 export const createOrder = async (orderData: CreateOrderData): Promise<boolean> => {
@@ -64,7 +65,8 @@ export const createOrder = async (orderData: CreateOrderData): Promise<boolean> 
           quantity: product.quantity,
           unit_price: product.price,
           subtotal: product.subtotal
-        }))
+        })),
+        user_id: orderData.user_id
       }),
     });
     console.log('Commande créée avec succès:', order);

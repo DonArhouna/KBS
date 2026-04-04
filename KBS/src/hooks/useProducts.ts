@@ -52,13 +52,22 @@ export const useProducts = () => {
     setIsLoading(true);
     try {
       let imageUrl = formData.image;
+
+      // Si l'image est en base64, on doit l'uploader d'abord
       if (formData.image.startsWith('data:image')) {
         const file = await base64ToFile(formData.image, `product-${Date.now()}.jpg`);
         if (file) {
           const uploadedUrl = await uploadImage(file, 'images', 'products');
           if (uploadedUrl) {
             imageUrl = uploadedUrl;
+          } else {
+            // Upload échoué : on bloque pour éviter de stocker la base64 en DB
+            toast.error("Erreur lors de l'upload de l'image. Vérifiez votre connexion et réessayez.");
+            return false;
           }
+        } else {
+          toast.error("Erreur lors du traitement de l'image.");
+          return false;
         }
       }
 

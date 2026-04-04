@@ -103,7 +103,7 @@ const HeroCarousel = ({ images, title = "", subtitle = "", children }: HeroCarou
         <link key={index} rel="preload" as="image" href={image} />
       ))}
       
-      <section className="relative h-[60vh] min-h-[400px] flex items-center overflow-hidden">
+      <section className="relative h-[50vh] sm:h-[60vh] min-h-[350px] sm:min-h-[400px] flex items-center overflow-hidden">
         <div 
           className={`absolute inset-0 transition-opacity duration-500 ease-in-out ${
             isCurrentImageLoaded ? 'opacity-100' : 'opacity-90'
@@ -117,12 +117,12 @@ const HeroCarousel = ({ images, title = "", subtitle = "", children }: HeroCarou
           <div className="max-w-2xl animate-fade-in">
             {/* Affichage conditionnel du titre et sous-titre */}
             {title && (
-              <h1 className="text-white mb-4 drop-shadow-lg">
+              <h1 className="text-white mb-4 drop-shadow-lg text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
                 {title}
               </h1>
             )}
             {subtitle && (
-              <p className="text-white/90 text-lg mb-8 drop-shadow-md">
+              <p className="text-white/90 text-sm sm:text-lg md:text-xl mb-6 sm:mb-8 drop-shadow-md max-w-xl">
                 {subtitle}
               </p>
             )}
@@ -135,19 +135,19 @@ const HeroCarousel = ({ images, title = "", subtitle = "", children }: HeroCarou
             <Button
               variant="outline"
               size="icon"
-              className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm rounded-2xl"
+              className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-20 bg-white/10 border-white/20 text-white hover:bg-white/30 backdrop-blur-sm rounded-xl sm:rounded-2xl h-10 w-10 sm:h-12 sm:w-12"
               onClick={goToPrevious}
             >
-              <ChevronLeft className="h-6 w-6" />
+              <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6" />
             </Button>
             
             <Button
               variant="outline"
               size="icon"
-              className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-white/20 border-white/30 text-white hover:bg-white/30 backdrop-blur-sm rounded-2xl"
+              className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-20 bg-white/10 border-white/20 text-white hover:bg-white/30 backdrop-blur-sm rounded-xl sm:rounded-2xl h-10 w-10 sm:h-12 sm:w-12"
               onClick={goToNext}
             >
-              <ChevronRight className="h-6 w-6" />
+              <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" />
             </Button>
 
             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex space-x-2">

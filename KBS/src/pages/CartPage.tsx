@@ -1,16 +1,31 @@
 
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ShoppingCart, Plus, Minus, Trash2, ArrowLeft } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
 import { useScrollToTop } from "@/hooks/useScrollToTop";
 import { toast } from "sonner";
 import { formatPrice } from "@/lib/utils";
+import CheckoutStepper from "@/components/CheckoutStepper";
 
 const CartPage = () => {
   useScrollToTop();
+  const navigate = useNavigate();
   const { cartItems, updateQuantity, removeFromCart, getTotalPrice, clearCart } = useCart();
+  const { isAuthenticated } = useAuth();
+
+  const handleCheckout = () => {
+    if (!isAuthenticated) {
+      toast.error("Veuillez vous connecter pour passer commande", {
+        description: "Vous allez être redirigé vers la page de connexion."
+      });
+      navigate("/login", { state: { from: "/order" } });
+      return;
+    }
+    navigate("/order");
+  };
 
   const handleClearCart = () => {
     clearCart();
@@ -39,6 +54,8 @@ const CartPage = () => {
   return (
     <div className="min-h-screen bg-kbs-beige">
       <div className="container-custom py-8">
+        <CheckoutStepper currentStep={1} />
+
         <Link to="/products" className="inline-flex items-center text-kbs-green hover:text-kbs-green/80 mb-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Continuer les achats
@@ -48,7 +65,7 @@ const CartPage = () => {
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl shadow-md p-6">
               <h1 className="text-2xl font-bold text-kbs-brown mb-6">Mon Panier</h1>
-              
+
               <div className="space-y-4">
                 {cartItems.map((item) => (
                   <div key={item.id} className="flex items-center gap-4 p-4 border border-gray-200 rounded-2xl">
@@ -57,7 +74,7 @@ const CartPage = () => {
                       alt={item.name}
                       className="w-16 h-16 object-cover rounded-xl"
                     />
-                    
+
                     <div className="flex-1">
                       <h3 className="font-semibold text-gray-800">{item.name}</h3>
                       <p className="text-kbs-green font-medium">{formatPrice(item.price)} FCFA</p>
@@ -111,7 +128,7 @@ const CartPage = () => {
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl shadow-md p-6 sticky top-8">
               <h2 className="text-xl font-semibold text-kbs-brown mb-4">Résumé de la commande</h2>
-              
+
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-gray-600">
                   <span>Sous-total</span>
@@ -129,15 +146,13 @@ const CartPage = () => {
               </div>
 
               <div className="space-y-3">
-                <Link to="/order" className="block">
-                  <Button size="lg" className="w-full bg-kbs-green hover:bg-kbs-green/90 rounded-2xl">
-                    Passer la commande
-                  </Button>
-                </Link>
-                
-                <Button 
-                  variant="outline" 
-                  size="lg" 
+                <Button size="lg" className="w-full bg-kbs-green hover:bg-kbs-green/90 rounded-2xl" onClick={handleCheckout}>
+                  Passer la commande
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="lg"
                   className="w-full border-red-500 text-red-500 hover:bg-red-50 rounded-2xl"
                   onClick={handleClearCart}
                 >

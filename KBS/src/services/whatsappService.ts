@@ -7,7 +7,7 @@ export const sendWhatsAppMessage = async (message: string): Promise<void> => {
   try {
     console.log('Envoi du message WhatsApp via backend proxy');
 
-    const response = await fetch('http://localhost:3001/api/send-whatsapp', {
+    const response = await fetch(import.meta.env.VITE_API_BASE_URL + '/send-whatsapp', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

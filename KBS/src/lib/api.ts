@@ -10,26 +10,39 @@ export async function apiRequest<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_CONFIG.BASE_URL}${endpoint}`;
-  
+
   const config: RequestInit = {
+    ...options,
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
     },
-    ...options,
+    credentials: 'include',
   };
 
   try {
     const response = await fetch(url, config);
-    
+
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        if (errorData && (errorData.error || errorData.message)) {
+          errorMessage = errorData.error || errorData.message;
+        }
+      } catch (e) {
+        // Corps non JSON, on garde le message par défaut
+      }
+      throw new Error(errorMessage);
     }
-    
+
     return await response.json();
   } catch (error) {
-    console.error(`API request failed for ${endpoint}:`, error);
-    throw error;
+    if (error instanceof Error) {
+      console.error(`API request failed for ${endpoint}:`, error.message);
+      throw error;
+    }
+    throw new Error('Une erreur inattendue est survenue');
   }
 }
 
@@ -41,6 +54,7 @@ export async function uploadFile(file: File): Promise<{ imagePath: string; filen
   const response = await fetch(`${API_CONFIG.BASE_URL}/upload`, {
     method: 'POST',
     body: formData,
+    credentials: 'include',
   });
 
   if (!response.ok) {

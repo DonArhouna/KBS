@@ -1,7 +1,7 @@
 // Utilitaire pour initialiser la base de données
 export const initializeDatabase = async (): Promise<boolean> => {
   try {
-    const response = await fetch('http://localhost:3001/api/init-db', {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/init-db`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

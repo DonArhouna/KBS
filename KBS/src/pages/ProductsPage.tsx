@@ -23,7 +23,7 @@ const ProductsPage = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 9; // 3 rows of 3 products each
+  const itemsPerPage = 9; // 3 lignes de 3 produits par page
 
   // Pagination logic
   const totalPages = Math.ceil(products.length / itemsPerPage);
@@ -32,7 +32,10 @@ const ProductsPage = () => {
   const currentProducts = products.slice(startIndex, endIndex);
 
   const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages) return;
     setCurrentPage(page);
+    // Scroll doux vers la grille
+    document.getElementById('products-grid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   // Charger les produits et catégories depuis Supabase
@@ -99,18 +102,18 @@ const ProductsPage = () => {
         imageSrc={contentImages.bannerImage}
       />
 
-      {/* Product Filters */}
-      <section className="bg-white py-8 border-b">
+      {/* Product Filters - Scroll horizontal moderne */}
+      <section className="bg-white py-6 sm:py-8 border-b sticky top-20 z-40">
         <div className="container-custom">
-          <div className="flex overflow-x-auto pb-2 gap-2">
+          <div className="flex overflow-x-auto pb-4 gap-2 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 sm:justify-center">
             {categories.map((category) => (
               <button
                 key={category.id}
                 onClick={() => setActiveCategory(category.id)}
-                className={`px-4 py-2 whitespace-nowrap rounded-full transition-colors ${
+                className={`px-6 py-2.5 whitespace-nowrap rounded-2xl text-sm font-bold transition-all duration-300 ${
                   activeCategory === category.id
-                    ? "bg-kbs-green text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    ? "bg-kbs-green text-white shadow-lg shadow-kbs-green/20 scale-105"
+                    : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-transparent hover:border-kbs-green/10"
                 }`}
               >
                 {category.name}
@@ -121,7 +124,7 @@ const ProductsPage = () => {
       </section>
 
       {/* Products Grid */}
-      <section className="py-16 bg-kbs-beige">
+      <section className="py-10 sm:py-16 bg-kbs-beige/30">
         <div className="container-custom">
           {isLoading ? (
             <div className="flex justify-center items-center py-12">
@@ -131,50 +134,74 @@ const ProductsPage = () => {
             <>
               {products.length > 0 ? (
                 <>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 justify-center">
+                  <div id="products-grid" className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 justify-center">
                     {currentProducts.map((product) => (
                       <ProductCard key={product.id} {...product} />
                     ))}
                   </div>
 
-                  {/* Pagination */}
+                  {/* Pagination Premium */}
                   {totalPages > 1 && (
-                    <div className="flex justify-center items-center mt-12 gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
+                    <div id="pagination-bar" className="flex justify-center items-center mt-14 gap-2">
+
+                      {/* Flèche gauche */}
+                      <button
                         onClick={() => handlePageChange(currentPage - 1)}
                         disabled={currentPage === 1}
-                        className="rounded-full border-kbs-green text-kbs-green hover:bg-kbs-green hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="group relative flex items-center justify-center w-11 h-11 rounded-2xl border-2 border-kbs-green/30 bg-white text-kbs-green shadow-sm transition-all duration-300 hover:border-kbs-green hover:bg-kbs-green hover:text-white hover:shadow-lg hover:scale-110 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:bg-white disabled:hover:text-kbs-green"
+                        aria-label="Page précédente"
                       >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
+                        <ChevronLeft className="h-5 w-5 transition-transform duration-200 group-hover:-translate-x-0.5" />
+                      </button>
 
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <Button
-                          key={page}
-                          variant={currentPage === page ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => handlePageChange(page)}
-                          className={`rounded-full min-w-[40px] ${
-                            currentPage === page
-                              ? "bg-kbs-green text-white hover:bg-kbs-green/90"
-                              : "border-kbs-green text-kbs-green hover:bg-kbs-green hover:text-white"
-                          }`}
-                        >
-                          {page}
-                        </Button>
-                      ))}
+                      {/* Numéros de pages */}
+                      <div className="flex items-center gap-1.5">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                          // Afficher max 5 pages autour de la page courante
+                          if (
+                            page === 1 ||
+                            page === totalPages ||
+                            (page >= currentPage - 1 && page <= currentPage + 1)
+                          ) {
+                            return (
+                              <button
+                                key={page}
+                                onClick={() => handlePageChange(page)}
+                                className={`relative min-w-[44px] h-11 rounded-2xl text-sm font-semibold transition-all duration-300 ${
+                                  currentPage === page
+                                    ? 'bg-gradient-to-br from-kbs-green to-kbs-light text-white shadow-lg shadow-kbs-green/30 scale-110'
+                                    : 'bg-white border-2 border-kbs-green/20 text-kbs-green hover:border-kbs-green hover:bg-kbs-green/5 hover:scale-105'
+                                }`}
+                              >
+                                {page}
+                                {currentPage === page && (
+                                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-kbs-green rounded-full" />
+                                )}
+                              </button>
+                            );
+                          }
+                          // Ellipsis
+                          if (page === currentPage - 2 || page === currentPage + 2) {
+                            return (
+                              <span key={page} className="flex items-end pb-1 text-kbs-green/50 font-bold text-lg tracking-widest select-none px-1">
+                                &middot;&middot;&middot;
+                              </span>
+                            );
+                          }
+                          return null;
+                        })}
+                      </div>
 
-                      <Button
-                        variant="outline"
-                        size="sm"
+                      {/* Flèche droite */}
+                      <button
                         onClick={() => handlePageChange(currentPage + 1)}
                         disabled={currentPage === totalPages}
-                        className="rounded-full border-kbs-green text-kbs-green hover:bg-kbs-green hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="group relative flex items-center justify-center w-11 h-11 rounded-2xl border-2 border-kbs-green/30 bg-white text-kbs-green shadow-sm transition-all duration-300 hover:border-kbs-green hover:bg-kbs-green hover:text-white hover:shadow-lg hover:scale-110 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:bg-white disabled:hover:text-kbs-green"
+                        aria-label="Page suivante"
                       >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
+                        <ChevronRight className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-0.5" />
+                      </button>
+
                     </div>
                   )}
                 </>

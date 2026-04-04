@@ -195,7 +195,7 @@ const HomePage = () => {
           <HeroCarousel
             images={content.heroImages}
           >
-            <div className="flex flex-col sm:flex-row gap-4 mt-36">
+            <div className="flex flex-col sm:flex-row gap-4 mt-20 sm:mt-28 md:mt-36">
               <Button
                 onClick={() => navigate("/products")}
                 size="lg"
@@ -218,7 +218,7 @@ const HomePage = () => {
       </section>
 
       {/* Section À Propos */}
-      <section className="py-20 bg-white relative overflow-hidden" ref={aboutSection.elementRef}>
+      <section className="py-12 md:py-20 bg-white relative overflow-hidden" ref={aboutSection.elementRef}>
         <div className="absolute inset-0 bg-gradient-to-r from-kbs-green/3 to-kbs-light/3"></div>
         <div className="container-custom relative">
           <div className="grid lg:grid-cols-2 gap-16 items-center animate-fadeInUp">
@@ -231,7 +231,7 @@ const HomePage = () => {
                 <Leaf className="mr-2 h-4 w-4" />
                 À propos de nous
               </Badge>
-              <h2 className="text-4xl font-bold text-kbs-brown mb-6 leading-tight">
+              <h2 className="text-3xl sm:text-4xl font-bold text-kbs-brown mb-6 leading-tight">
                 {content.aboutTitle}
               </h2>
               <p className="text-lg text-gray-600 font-light leading-relaxed mb-8">
@@ -283,7 +283,7 @@ const HomePage = () => {
       </section>
 
       {/* Section Caractéristiques */}
-      <section className="py-20 bg-gradient-to-br from-kbs-beige/30 via-white to-kbs-beige/10 relative" ref={featuresSection.elementRef}>
+      <section className="py-12 md:py-20 bg-gradient-to-br from-kbs-beige/30 via-white to-kbs-beige/10 relative" ref={featuresSection.elementRef}>
         <div className="absolute inset-0 bg-gradient-to-br from-kbs-green/3 to-kbs-light/5 opacity-50"></div>
         <div className="container-custom relative">
           <div className={`text-center mb-16 animate-fadeInUp ${
@@ -293,7 +293,7 @@ const HomePage = () => {
               <Award className="mr-2 h-4 w-4" />
               Nos avantages
             </Badge>
-            <h2 className="text-4xl font-bold text-kbs-brown mb-6 leading-tight">
+            <h2 className="text-3xl sm:text-4xl font-bold text-kbs-brown mb-6 leading-tight">
               {content.featuresTitle}
             </h2>
             <p className="text-lg text-gray-600 font-light leading-relaxed max-w-3xl mx-auto">
@@ -341,7 +341,7 @@ const HomePage = () => {
       </section>
 
       {/* Section Produits Populaires */}
-      <section className="py-20 bg-white relative overflow-hidden" ref={productsSection.elementRef}>
+      <section className="py-12 md:py-20 bg-white relative overflow-hidden" ref={productsSection.elementRef}>
         <div className="absolute inset-0 bg-gradient-to-r from-kbs-light/3 to-kbs-green/3"></div>
         <div className="container-custom relative">
           <div className={`text-center mb-12 animate-fadeInUp ${
@@ -351,7 +351,7 @@ const HomePage = () => {
               <Sparkles className="mr-2 h-4 w-4" />
               Produits populaires
             </Badge>
-            <h2 className="text-4xl font-bold text-kbs-brown mb-6 leading-tight">
+            <h2 className="text-3xl sm:text-4xl font-bold text-kbs-brown mb-6 leading-tight">
               Des produits d'exception
             </h2>
             <p className="text-lg text-gray-600 font-light leading-relaxed max-w-3xl mx-auto">
